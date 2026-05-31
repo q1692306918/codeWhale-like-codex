@@ -70,6 +70,33 @@ ask records are currently a narrow foundation: when one matches under
 `AskForApproval::Never`, the command is rejected because the runtime cannot ask
 the user; existing allow/deny behavior is otherwise unchanged.
 
+### Child process environment
+
+Every shell, hook, MCP, and PTY child process starts from `env_clear()` + an
+explicit allowlist of parent environment variables (`child_env.rs`). This
+prevents accidental secret exfiltration while preserving the system context
+CLIs need to discover installed tools, language runtimes, and user config.
+
+**Base allowlist (all platforms):** `PATH`, `HOME`, `USER`/`USERNAME`/`LOGNAME`,
+`LANG`/`LC_*`/`LANGUAGE`, `TERM`/`COLORTERM`, `NO_COLOR`/`FORCE_COLOR`,
+`SHELL`, `TMPDIR`/`TMP`/`TEMP`, `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`/
+`ALL_PROXY`/`FTP_PROXY` (all case variants).
+
+**Windows additions:** `SYSTEMROOT`, `WINDIR`, `COMSPEC`, `PATHEXT`,
+`USERPROFILE`, `HOMEDRIVE`, `HOMEPATH`, **`APPDATA`**, **`LOCALAPPDATA`**,
+plus MSVC toolchain vars (`LIB`, `LIBPATH`, `INCLUDE`, `VSINSTALLDIR`, …).
+`APPDATA` and `LOCALAPPDATA` let CLIs like `gh`, `kubectl`, `gcloud`, and Git
+credential managers find their auth config directories under `%APPDATA%`.
+
+**MCP-only additions:** `NVM_DIR`, `NODE_OPTIONS`, `NODE_PATH`,
+`NPM_CONFIG_*`, `VOLTA_HOME`, `COREPACK_HOME`, `PYTHONPATH`, `VIRTUAL_ENV`,
+`POETRY_HOME`, `GEM_HOME`, `JAVA_HOME`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, and
+related bootstrap vars.
+
+**What stays excluded:** All `*_API_KEY`, `*_TOKEN`, `AWS_*`, and similarly
+shaped secret-bearing variables, regardless of platform. Explicit overrides
+passed by the runtime (sandbox markers, hook vars, MCP config) always win.
+
 ### MCP manager and palette discovery
 
 MCP server configuration is surfaced in the TUI through `/mcp` and the

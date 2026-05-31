@@ -149,6 +149,13 @@ fn is_allowed_parent_env_key(key: &OsStr) -> bool {
             | "USERPROFILE"
             | "HOMEDRIVE"
             | "HOMEPATH"
+            // Windows config-directory env vars. Needed by CLIs that store
+            // auth/config state under %APPDATA% (gh, kubectl, gcloud, …) or
+            // %LOCALAPPDATA% (Git credential managers, …). These are standard
+            // Windows system locations, not secret-bearing variables — the
+            // data *inside* those directories is protected by filesystem ACLs.
+            | "APPDATA"
+            | "LOCALAPPDATA"
             // Preserve Windows toolchain context when the parent shell has
             // already loaded VsDevCmd / vcvars. Without these, `exec_shell`
             // can find `link.exe` via PATH but still fail to resolve
@@ -511,6 +518,52 @@ mod tests {
             .find(|(key, _)| normalize_key(key) == "PATH")
             .map(|(_, value)| value);
         assert_eq!(path, Some(&OsString::from("/explicit/bin")));
+    }
+
+    #[test]
+    fn child_env_allowlist_includes_windows_appdata_vars() {
+        // APPDATA and LOCALAPPDATA must pass through the child environment
+        // allowlist. Windows CLIs like gh, kubectl, and gcloud read auth
+        // config from %APPDATA%; Git credential managers use %LOCALAPPDATA%.
+        assert!(is_allowed_parent_env_key(OsStr::new("APPDATA")));
+        assert!(is_allowed_parent_env_key(OsStr::new("LOCALAPPDATA")));
+    }
+
+    #[test]
+    fn sanitized_child_env_preserves_windows_appdata_vars() {
+        let _guard = env_lock().lock().expect("env lock");
+        let prev_appdata = std::env::var_os("APPDATA");
+        let prev_localappdata = std::env::var_os("LOCALAPPDATA");
+        unsafe {
+            std::env::set_var("APPDATA", r"C:\Users\test\AppData\Roaming");
+            std::env::set_var("LOCALAPPDATA", r"C:\Users\test\AppData\Local");
+        }
+
+        let env = sanitized_child_env(std::iter::empty::<(OsString, OsString)>());
+
+        unsafe {
+            match prev_appdata {
+                Some(v) => std::env::set_var("APPDATA", v),
+                None => std::env::remove_var("APPDATA"),
+            }
+            match prev_localappdata {
+                Some(v) => std::env::set_var("LOCALAPPDATA", v),
+                None => std::env::remove_var("LOCALAPPDATA"),
+            }
+        }
+
+        assert!(
+            env.iter().any(|(key, value)| {
+                key == "APPDATA" && value == r"C:\Users\test\AppData\Roaming"
+            }),
+            "child env should preserve APPDATA"
+        );
+        assert!(
+            env.iter().any(|(key, value)| {
+                key == "LOCALAPPDATA" && value == r"C:\Users\test\AppData\Local"
+            }),
+            "child env should preserve LOCALAPPDATA"
+        );
     }
 
     #[test]
