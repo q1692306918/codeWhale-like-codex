@@ -1,9 +1,0 @@
-[submodule "CodeWhale"]
-	path = CodeWhale
-	url = https://github.com/Hmbown/CodeWhale.git
-	branch = main
-
-[submodule "codex"]
-	path = codex
-	url = https://github.com/openai/codex.git
-	branch = main
