@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-This repository contains vendored copies of two upstream projects.
+This repository is based on CodeWhale source code.
 
 ## CodeWhale
 
@@ -8,8 +8,11 @@ This repository contains vendored copies of two upstream projects.
 - License: MIT
 - Keep: copyright notice and MIT license text
 
-## codex
+## Codex External Reference
 
 - Upstream: https://github.com/openai/codex.git
 - License: Apache License 2.0
-- Keep: Apache 2.0 license, required notices, and `NOTICE` file contents
+- Status: external local reference only; not vendored and not committed here
+
+If codex code is copied into this repository later, keep the Apache 2.0 license,
+required notices, and `NOTICE` file contents for the copied material.
